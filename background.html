@@ -1,0 +1,287 @@
+/*
+ * Copyright (c) 2024 Hannah Pahama
+ * All rights reserved.
+ *
+ * This code is licensed under the MIT License.
+ * See the LICENSE file for more information.
+ */
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Expanding and Rotating Nodes</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+        }
+        canvas { 
+            display: block; 
+        }
+    </style>
+</head>
+<body>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script>
+        // Set up scene, camera, and renderer
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const nodes = [];
+        const velocities = [];
+        const nodeCount = 100;
+        const geometry = new THREE.SphereGeometry(0.1, 16, 16); // Smoother spheres
+        let lines = [];
+        const connections = [];
+
+        const primaryColors = [new THREE.Color(1.0, 0, 0), new THREE.Color(1.0, 1.0, 0), new THREE.Color(0, 0, 1.0)];
+        const secondaryColors = {
+            purple: new THREE.Color(0.5, 0, 0.5),
+            orange: new THREE.Color(1.0, 0.5, 0),
+            cyan: new THREE.Color(0, 1.0, 1.0)
+        };
+
+        // Lighting setup
+        const ambientLight = new THREE.AmbientLight(0x404040, 1); // Soft light
+        scene.add(ambientLight);
+
+        const pointLight = new THREE.PointLight(0xffffff, 1, 100); // Bright point light
+        pointLight.position.set(10, 10, 10); // Light position
+        scene.add(pointLight);
+
+        function createNodes() {
+            for (let i = 0; i < nodeCount; i++) {
+                const color = primaryColors[i % 3];
+                const material = new THREE.MeshStandardMaterial({ 
+                    color, 
+                    emissive: color, 
+                    metalness: 0.5,  // Adds shiny surface
+                    roughness: 0.3   // Adds roughness to simulate a non-perfect surface
+                });
+                const node = new THREE.Mesh(geometry, material);
+                node.position.set(Math.random() * 10 - 5, Math.random() * 10 - 5, Math.random() * 10 - 5);
+                nodes.push(node);
+
+                // Assigning a random velocity for varied movement
+                const velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * (Math.random() * 0.05 + 0.01), // Randomized speed factor
+                    (Math.random() - 0.5) * (Math.random() * 0.05 + 0.01),
+                    (Math.random() - 0.5) * (Math.random() * 0.05 + 0.01)
+                );
+                velocities.push(velocity);
+                connections.push([]);
+                scene.add(node);
+            }
+        }
+
+        function updateConnections() {
+            const thresholdDistance = 3;
+            const activeLines = new Set(); // Track the active lines to remove inactive ones
+
+            nodes.forEach((node, i) => {
+                connections[i] = [];
+                let nearestNodes = nodes.filter((_, j) => i !== j && node.position.distanceTo(nodes[j].position) < thresholdDistance);
+                connections[i] = nearestNodes.length >= 8 ? nearestNodes.map(n => nodes.indexOf(n)) : findClosestNodes(i, 8);
+            });
+
+            // Update lines and remove unused ones
+            connections.forEach((conn, i) => {
+                conn.forEach(j => {
+                    const positions = [...nodes[i].position.toArray(), ...nodes[j].position.toArray()];
+                    const lineColor = getLineColor(nodes[i].material.color, nodes[j].material.color);
+
+                    let line = lines.find(l => (l.startIndex === i && l.endIndex === j) || (l.startIndex === j && l.endIndex === i));
+                    if (!line) {
+                        // Create a new line if it doesn't exist
+                        const lineGeometry = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+                        const lineMaterial = new THREE.LineBasicMaterial({ 
+                            color: lineColor,
+                            transparent: true,
+                            opacity: 1.0,
+                            linewidth: 2, // Thickness of the line
+                            depthTest: false, // Prevent overlap covering
+                            depthWrite: false, // Prevent overlap covering
+                            emissive: lineColor // Makes the line "glow"
+                        });
+                        line = new THREE.LineSegments(lineGeometry, lineMaterial);
+                        line.startIndex = i;
+                        line.endIndex = j;
+                        lines.push(line);
+                        scene.add(line);
+                    } else {
+                        // Update the existing line geometry
+                        const lineGeometry = line.geometry;
+                        lineGeometry.attributes.position.array.set(positions);
+                        lineGeometry.attributes.position.needsUpdate = true;
+                    }
+
+                    // Mark this line as active
+                    activeLines.add(line);
+                });
+            });
+
+            // Remove lines that are no longer active
+            lines.forEach(line => {
+                if (!activeLines.has(line)) {
+                    scene.remove(line);
+                    lines = lines.filter(l => l !== line); // Remove it from the array as well
+                }
+            });
+        }
+
+        function getLineColor(color1, color2) {
+            if ((color1.equals(primaryColors[0]) && color2.equals(primaryColors[2])) || (color1.equals(primaryColors[2]) && color2.equals(primaryColors[0]))) {
+                return secondaryColors.purple;
+            }
+            if ((color1.equals(primaryColors[0]) && color2.equals(primaryColors[1])) || (color1.equals(primaryColors[1]) && color2.equals(primaryColors[0]))) {
+                return secondaryColors.orange;
+            }
+            if ((color1.equals(primaryColors[2]) && color2.equals(primaryColors[1])) || (color1.equals(primaryColors[1]) && color2.equals(primaryColors[2]))) {
+                return secondaryColors.cyan;
+            }
+            return color1; // Same color nodes
+        }
+
+        function findClosestNodes(nodeIndex, n) {
+            const distances = nodes.map((_, i) => i !== nodeIndex && { index: i, distance: nodes[nodeIndex].position.distanceTo(nodes[i].position) })
+                                   .filter(Boolean)
+                                   .sort((a, b) => a.distance - b.distance);
+            return distances.slice(0, n).map(d => d.index);
+        }
+
+        let targetRotationX = 0;
+        let targetRotationY = 0;
+        const rotationSpeed = 0.05; // Speed of scene rotation
+
+        let targetScale = 1;
+        const scaleSpeed = 0.2; // Speed of node scaling
+        const scaleLerpSpeed = 0.05; // Speed at which nodes scale back to the target size
+
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let isTouching = false;
+        let isSwiping = false;
+
+        window.addEventListener('mousedown', (event) => {
+            isTouching = true;
+            isSwiping = false;  // Reset swipe state
+            touchStartX = event.clientX;
+            touchStartY = event.clientY;
+        });
+
+        window.addEventListener('mousemove', (event) => {
+            if (isTouching) {
+                const deltaX = event.clientX - touchStartX;
+                const deltaY = event.clientY - touchStartY;
+
+                if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                    // Left-right swipe
+                    if (deltaX > 0) {
+                        // Swipe right
+                        targetRotationY -= 0.1; // Rotate scene to the right
+                    } else {
+                        // Swipe left
+                        targetRotationY += 0.1; // Rotate scene to the left
+                    }
+                } else {
+                    // Up-down swipe
+                    if (deltaY > 0) {
+                        // Swipe down
+                        targetRotationX -= 0.1; // Rotate scene down
+                    } else {
+                        // Swipe up
+                        targetRotationX += 0.1; // Rotate scene up
+                    }
+                }
+
+                // If swipe is detected, flag it and stop hover behavior
+                isSwiping = true;
+                touchStartX = event.clientX;
+                touchStartY = event.clientY;
+            }
+
+            // Handle hover behavior only if not swiping
+            if (!isSwiping) {
+                const mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+                const mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+
+                // Smoothly map mouse position to scene rotation
+                targetRotationX = mouseY * Math.PI; // Vertical rotation
+                targetRotationY = mouseX * Math.PI; // Horizontal rotation
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            isTouching = false;
+            isSwiping = false;  // Reset swipe state
+        });
+
+        // Update camera aspect ratio and renderer size on window resize
+        window.addEventListener('resize', () => {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+
+            renderer.setSize(width, height);
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+        });
+
+        function updateSceneRotation() {
+            scene.rotation.x += (targetRotationX - scene.rotation.x) * rotationSpeed;
+            scene.rotation.y += (targetRotationY - scene.rotation.y) * rotationSpeed;
+
+            // Smooth scaling effect on nodes using lerp (linear interpolation)
+            nodes.forEach(node => {
+                node.scale.set(
+                    THREE.MathUtils.lerp(node.scale.x, targetScale, scaleLerpSpeed),
+                    THREE.MathUtils.lerp(node.scale.y, targetScale, scaleLerpSpeed),
+                    THREE.MathUtils.lerp(node.scale.z, targetScale, scaleLerpSpeed)
+                ); // Smoothly interpolate between current scale and target scale
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Move nodes with their respective velocities
+            nodes.forEach((node, i) => {
+                node.position.add(velocities[i]);
+
+                // Add boundary checks for nodes to bounce within the scene
+                if (Math.abs(node.position.x) > 5) velocities[i].x = -velocities[i].x;
+                if (Math.abs(node.position.y) > 5) velocities[i].y = -velocities[i].y;
+                if (Math.abs(node.position.z) > 5) velocities[i].z = -velocities[i].z;
+
+                // Adjust node transparency based on distance from camera
+                const distance = node.position.distanceTo(camera.position);
+                const maxDistance = 20;
+                const opacity = Math.max(0.1, 1 - distance / maxDistance); // Clamp opacity between 0.1 and 1
+                node.material.opacity = opacity;
+            });
+
+            // Update line transparency based on distance from camera
+            lines.forEach(line => {
+                const distStart = nodes[line.startIndex].position.distanceTo(camera.position);
+                const distEnd = nodes[line.endIndex].position.distanceTo(camera.position);
+                const avgDist = (distStart + distEnd) / 2;
+                const opacity = Math.max(0.1, 1 - avgDist / 20); // Adjust for line transparency
+                line.material.opacity = opacity;
+            });
+
+            updateSceneRotation();
+            updateConnections();
+            renderer.render(scene, camera);
+        }
+
+        createNodes();
+        camera.position.z = 15;
+        animate();
+    </script>
+</body>
+</html>
