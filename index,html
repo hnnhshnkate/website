@@ -1,0 +1,289 @@
+/*
+ * Copyright (c) 2024 Hannah Pahama
+ * All rights reserved.
+ *
+ * This code is licensed under the MIT License.
+ * See the LICENSE file for more information.
+ */
+//Yeph
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HSKP</title>
+    <!-- Importing Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Full-screen background iframe */
+        #background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0; /* Ensure it's below other content */
+            pointer-events: auto; /* Allow interaction with the iframe */
+            border: none;
+        }
+
+        /* Header styles */
+        .header {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background-color: black; /* Solid black background */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            color: white;
+            z-index: 2;
+            box-sizing: border-box; /* Ensure padding is included in the width */
+            transition: all 0.3s ease;
+        }
+
+        /* Set Roboto as the default font for body */
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Set Poppins for headings */
+        .header .name,
+        .header .abbreviated-name {
+            font-family: 'Poppins', sans-serif;
+            font-size: 2em;
+            font-weight: bold;
+            padding-left: 10px; /* Reduced padding */
+            white-space: nowrap; /* Prevent name from wrapping */
+            display: inline-block; /* Allow both names to fit inline */
+            opacity: 0; /* Make names invisible initially */
+            transition: opacity 0.3s ease; /* Smooth fade-in */
+        }
+
+        .header .abbreviated-name {
+            display: none; /* Hide the abbreviated name by default */
+        }
+
+        .header .title {
+            font-family: 'Poppins', sans-serif; /* Use Poppins for the title */
+            margin-top: 5px;
+            font-size: 1em;
+            padding-left: 10px; /* Reduced padding */
+        }
+
+        /* Navigation styles */
+        .header .nav {
+            display: flex;
+            gap: 20px;
+            padding-right: 20px; /* Reduced right padding */
+        }
+
+        .header .nav a {
+            color: white;
+            text-decoration: none;
+            font-size: 1em;
+            padding: 10px;
+            border-radius: 5px; /* Slightly rounded corners */
+            transition: background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease; /* Add transition for background color, text color, and box shadow */
+        }
+
+        /* Hover effect on navigation links */
+        .header .nav a:hover,
+        .header .nav a:active {
+            background-color: #f39c12; /* Background color when hovered */
+            color: #2c3e50; /* Dark text when hovered */
+            box-shadow: 0 0 8px rgba(0, 0, 0, 0.2); /* Adds shadow when active */
+            border-radius: 8px; /* Subtly round the corners */
+        }
+
+        /* More visible press effect for navigation links */
+        .header .nav a:active {
+            background-color: #e67e22; /* Slightly darker shade when pressed */
+            color: #34495e; /* Darker text when pressed */
+            box-shadow: 0 0 12px rgba(0, 0, 0, 0.3); /* Slightly more pronounced shadow on press */
+        }
+
+        /* Hamburger menu styles */
+        .hamburger {
+            display: none; /* Hide hamburger icon by default */
+            cursor: pointer;
+            flex-direction: column;
+            gap: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .hamburger div {
+            width: 25px;
+            height: 3px;
+            background-color: white;
+            transition: all 0.3s ease;
+        }
+
+        /* More visible press effect for hamburger */
+        .hamburger:active div {
+            transform: scale(0.8); /* Shrinks the hamburger lines more */
+            background-color: #f39c12; /* Changes color on press */
+        }
+
+        /* Close button in hamburger */
+        .close-btn {
+            display: none; /* Hidden by default */
+            cursor: pointer;
+            font-size: 2em;
+            color: white;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 10px; /* Added padding for extra space around the X */
+            transition: all 0.3s ease;
+        }
+
+        /* More visible press effect for close button */
+        .close-btn:active {
+            transform: scale(0.8); /* Shrinks the close button */
+            color: #f39c12; /* Changes color on press */
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.4); /* Adds shadow on press */
+        }
+
+        /* Ensure the close button doesn’t overlap with the links */
+        .nav.open .close-btn {
+            display: block;
+            position: absolute;
+            top: 10px;
+            right: 10px; /* Keeps it in the top-right corner */
+            font-size: 2em;
+            color: white;
+            z-index: 10; /* Ensure the close button is always above the content */
+            padding: 12px; /* Padding to add space around the 'X' button */
+        }
+
+        /* Show hamburger icon when window is less than 480px */
+        @media (max-width: 480px) {
+            .header .nav {
+                display: none; /* Hide the normal navigation menu */
+            }
+
+            .hamburger {
+                display: flex; /* Show hamburger icon */
+            }
+        }
+
+        /* Show nav when hamburger menu is clicked */
+        .nav.open {
+            display: block;
+            position: absolute;
+            top: 50px;
+            right: 0;
+            background-color: black; /* Set black background for the dropdown */
+            width: 100%;
+            padding: 10px;
+            text-align: center;
+            z-index: 3;
+            height: auto; /* Let the height adjust based on the content */
+            box-sizing: border-box;
+            padding-bottom: 20px; /* Padding at the bottom */
+        }
+
+        .nav.open a {
+            display: block;
+            margin: 10px 0;
+            font-size: 1.2em;
+            color: white; /* Ensures links are white in the dropdown */
+        }
+
+        /* Add extra padding to the 'My Blogs' link when the menu is open */
+        .nav.open .nav-blogs {
+            padding-top: 12px; /* Adjusted padding to balance the space */
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Embed the background.html as an iframe -->
+    <iframe id="background" src="background.html" frameborder="0"></iframe>
+
+    <!-- Header with name, title, and navigation links -->
+    <div class="header">
+        <div>
+            <!-- Full name -->
+            <div class="name">Hannah S.K. Pahama</div>
+            <!-- Abbreviated name -->
+            <div class="abbreviated-name">HSKP</div>
+            <div class="title">Data Scientist</div>
+        </div>
+        <div class="nav">
+            <a href="#blogs" class="nav-blogs">My Blogs</a>
+            <a href="#portfolio" class="nav-portfolio">Portfolio</a>
+            <a href="#contact" class="nav-contact">Contact details</a>
+            <a href="#skillset" class="nav-skillset">Skillset</a> <!-- New link for Skillset -->
+            <!-- Close button inside the nav (only visible when the menu is open) -->
+            <div class="close-btn" onclick="closeMenu()">×</div>
+        </div>
+
+        <!-- Hamburger icon -->
+        <div class="hamburger" onclick="toggleMenu()">
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+    </div>
+
+    <script>
+        // Function to adjust name and nav labels display based on available space
+        function adjustDisplay() {
+            const header = document.querySelector('.header');
+            const name = document.querySelector('.name');
+            const abbreviatedName = document.querySelector('.abbreviated-name');
+            const navBlogs = document.querySelector('.nav-blogs');
+            const navPortfolio = document.querySelector('.nav-portfolio');
+            const navContact = document.querySelector('.nav-contact');
+            const navSkillset = document.querySelector('.nav-skillset');
+            const headerWidth = header.offsetWidth;
+
+            // If the full name doesn't fit, show abbreviated version
+            if (headerWidth <= 960) { // When width is 960px or smaller
+                name.style.display = 'none';
+                abbreviatedName.style.display = 'block';
+                // Shorten navigation labels
+                navBlogs.textContent = 'Blogs';
+                navPortfolio.textContent = 'Portfolio';
+                navContact.textContent = 'Contact';
+                navSkillset.textContent = 'Skill'; // Shorten Skillset to Skill
+                abbreviatedName.style.opacity = 1; // Fade in the abbreviated name
+            } else {
+                name.style.display = 'block';
+                abbreviatedName.style.display = 'none';
+                // Full navigation labels
+                navBlogs.textContent = 'My Blogs';
+                navPortfolio.textContent = 'Portfolio';
+                navContact.textContent = 'Contact details';
+                navSkillset.textContent = 'Skillset'; // Full label for Skillset
+                name.style.opacity = 1; // Fade in the full name
+            }
+        }
+
+        // Function to toggle the navigation menu (hamburger)
+        function toggleMenu() {
+            const nav = document.querySelector('.nav');
+            nav.classList.toggle('open');
+        }
+
+        // Function to close the navigation menu
+        function closeMenu() {
+            const nav = document.querySelector('.nav');
+            nav.classList.remove('open');
+        }
+
+        // Run on page load and on window resize
+        window.addEventListener('load', adjustDisplay);
+        window.addEventListener('resize', adjustDisplay);
+    </script>
+
+</body>
+</html>
